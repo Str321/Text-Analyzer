@@ -1,1 +1,76 @@
+# Model Deploy through Streamlit app
+
+# -*- coding: utf-8 -*-
+import streamlit as st
+import pickle
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+import string
+import nltk
+
+# text preprocessing
+
+ps=PorterStemmer()
+
+def text_transform(text):
+    # lower casing
+    text=text.lower()
+    
+    # tokenization
+    text=nltk.word_tokenize(text)
+    
+    # removing special characters
+    y=[]
+    for i in text:
+        if i.isalnum():
+            y.append(i)
+    text=y[:]
+    y.clear()
+     
+    #removing stopwords
+    for i in text:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
+    text=y[:]
+    y.clear()
+
+    # stemming
+    
+    for i in text:
+        y.append(ps.stem(i))
+        
+    return " ".join(y)
+  
+cv=pickle.load(open('vectorizer.pkl','rb'))
+model1=pickle.load(open('model1.pkl','rb'))
+model2=pickle.load(open('model2.pkl','rb'))
+
+st.title('TEXT ANALYZER')
+
+input_text=st.text_input('enter text')
+
+if st.button('Predict'):
+    
+    # 1. preprocess
+    transformed_text=text_transform(input_text)
+    # 2. vectorizer
+    vector_input=cv.transform([transformed_text])
+    # 3.model predict
+    result1=model1.predict(vector_input)[0]
+    
+    result2=model2.predict(vector_input)[0]
+    
+    if result1 == 1:
+        st.header('Spam')
+    else:
+        st.header('Not Spam')
+        
+    st.header('and')
+    if result2 ==1:
+        st.header('Positive Statement')
+        
+    else:
+        st.header('Negative Statement')
+        
+# use command streamlit run text.py with path
 
