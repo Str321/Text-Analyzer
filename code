@@ -1,1 +1,240 @@
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+import sklearn
+from sklearn.model_selection import train_test_split,cross_val_score
+from sklearn.model_selection import KFold,StratifiedKFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix,accuracy_score,precision_score
+
+import nltk
+import string
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer
+
+# SPAM DATASET
+data=pd.read_csv('E:\\STR\\DATA SETS\\spam.csv',encoding='iso-8859-1')
+
+# DATA PREPROCESSING
+ata.drop(columns=['Unnamed: 2','Unnamed: 3','Unnamed: 4'],inplace=True)
+data.rename(columns={'v1':'target',"v2":'text'},inplace=True)
+data=data.drop_duplicates()
+data['target'].value_counts()
+
+# encoding categorical data
+encode=LabelEncoder()
+data['target']=encode.fit_transform(data['target'])
+
+# EDA
+plt.pie(data['target'].value_counts(),labels=[ 'spam','ham'],autopct='%0.2f')
+plt.show()
+
+# TEXT PREPROCESSING
+ps=PorterStemmer()
+
+def text_transform(text):
+    # lower casing
+    text=text.lower()
+    
+    # tokenization
+    text=nltk.word_tokenize(text)
+    
+    # removing special characters
+    corpus=[]
+    for i in text:
+        if i.isalnum():
+            corpus.append(i)
+    text=corpus[:]
+    corpus.clear()
+     
+    #removing stopwords
+    for i in text:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            corpus.append(i)
+    text=corpus[:]
+    corpus.clear()
+
+    # stemming
+    
+    for i in text:
+        corpus.append(ps.stem(i))
+        
+    return " ".join(corpus)
+
+data['trf_text']=data['text'].apply(text_transform)
+
+cv=CountVectorizer(max_features=5000)
+
+x=cv.fit_transform(data['trf_text']).toarray()
+y=data['target'].values
+xtrain,xtest,ytrain,ytest=train_test_split(x,y,test_size=0.2,random_state=42)
+
+# MODEL SELECTION
+def model_score(model,xtrain,ytrain,xtest,ytest):
+    model.fit(xtrain,ytrain)
+    y_pred1=model.predict(xtrain)
+    sc_tr=accuracy_score(ytrain,y_pred1)
+    mat_tr=precision_score(ytrain,y_pred1)
+    
+    y_pred2=model.predict(xtest)
+    sc_test=accuracy_score(ytest,y_pred2)
+    mat_test=precision_score(ytest,y_pred2)
+    #plt.scatter(ytest,y_pred2)
+    
+    print(f'accuracy  score for train data is : {sc_tr} and for test data is : {sc_test}')    
+    print(f'precision score for train data is : {mat_tr} and for test data is : {mat_test}')
+    
+lr=LogisticRegression()
+rf=RandomForestClassifier()
+mnb=MultinomialNB()
+
+model_score(rf,xtrain,ytrain,xtest,ytest)
+model_score(mnb,xtrain,ytrain,xtest,ytest)
+model_score(lr,xtrain,ytrain,xtest,ytest)
+
+
+
+# by comparing with other models after validation Random Forest Classifier is the best model which gives best output
+rf.fit(xtrain,ytrain)
+pre=rf.predict(xtest)
+accuracy_score(ytest,pre),precision_score(ytest,pre)
+
+# RandomForest Classifier is Best Model
+
+#FINAL RESULTS ARE FOR UNSEEN DATA:
+# ACCURACY SCORE IS  : 0.965183752417795 
+# PRECISION SCORE IS : 0.990990990990991
+
+
+# TWITTER DATA ANALYSIS
+
+df=pd.read_csv('twitters.csv')
+
+df.drop_duplicates(inplace=True)
+df.dropna(inplace=True)
+df.drop(columns=['Unnamed: 0'],inplace=True)
+plt.pie(df['category'].value_counts(),labels=['positive', 'negative'],autopct='%0.2f')
+plt.show()
+
+# text transform
+df['text_trf']=df['clean_text'].apply(text_transform)
+
+a=cv.fit_transform(df['text_trf']).toarray()
+b=df['category']
+atrain,atest,btrain,btest=train_test_split(a,b,test_size=0.2,random_state=42)
+
+kfold=KFold(10)
+
+#Cross validation done for different models. Logistic regression show best out come but it tends to Overfitting 
+
+scores_lr= cross_val_score(lr, atrain, btrain, cv=kfold )
+print(model_score(lr,atrain,btrain,atest,btest))
+scores_lr.mean()
+model_score(lr,atrain,btrain,atest,btest)
+
+# After tuning the parameters Overfitting is Rectified and the Best Model is showen below
+
+lr2=LogisticRegression(penalty='l1',solver='liblinear',C=0.3)
+
+# for train data
+lr2.fit(atrain,btrain)
+lr_tr=lr2.predict(atrain)
+accuracy_score(btrain,lr_tr),precision_score(btrain,lr_tr)
+
+# for test data
+lr_te=lr2.predict(atest)
+accuracy_score(btest,lr_te),precision_score(btest,lr_te)
+
+#FINAL RESULTS ARE FOR UNSEEN DATA :
+# ACCURACY SCORE IS  : 0.823015873015
+# PRECISION SCORE IS : 0.805714285714
+
+# FOR WEBPAGE
+import pickle
+pickle.dump(cv,open('vectorizer.pkl','wb'))
+pickle.dump(rf,open('model1.pkl','wb'))
+pickle.dump(lr2,open('model2.pkl','wb'))
+
+
+# In Spider by using Streamlit app for web page
+
+# -*- coding: utf-8 -*-
+import streamlit as st
+import pickle
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+import string
+import nltk
+
+# text preprocessing
+
+ps=PorterStemmer()
+
+def text_transform(text):
+    # lower casing
+    text=text.lower()
+    
+    # tokenization
+    text=nltk.word_tokenize(text)
+    
+    # removing special characters
+    y=[]
+    for i in text:
+        if i.isalnum():
+            y.append(i)
+    text=y[:]
+    y.clear()
+     
+    #removing stopwords
+    for i in text:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
+    text=y[:]
+    y.clear()
+
+    # stemming
+    
+    for i in text:
+        y.append(ps.stem(i))
+        
+    return " ".join(y)
+  
+cv=pickle.load(open('vectorizer.pkl','rb'))
+model1=pickle.load(open('model1.pkl','rb'))
+model2=pickle.load(open('model2.pkl','rb'))
+
+st.title('TEXT ANALYZER')
+
+input_text=st.text_input('enter text')
+
+if st.button('Predict'):
+    
+    # 1. preprocess
+    transformed_text=text_transform(input_text)
+    # 2. vectorizer
+    vector_input=cv.transform([transformed_text])
+    # 3.model predict
+    result1=model1.predict(vector_input)[0]
+    
+    result2=model2.predict(vector_input)[0]
+    
+    if result1 == 1:
+        st.header('Spam')
+    else:
+        st.header('Not Spam')
+        
+    st.header('and')
+    if result2 ==1:
+        st.header('Positive Statement')
+        
+    else:
+        st.header('Negative Statement')
+        
+# use command streamlit run text.py with path
+
+ 
